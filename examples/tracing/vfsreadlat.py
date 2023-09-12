@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 #
 # vfsreadlat.py		VFS read latency distribution.
 #			For Linux, uses BCC, eBPF. See .c file.
@@ -38,9 +38,39 @@ if len(argv) > 1:
 		usage()
 
 # load BPF program
+a = BPF(src_file = "vfsreadlat.c")
+a.attach_kprobe(event="__sys_sendto", fn_name="do_entry")
+a.attach_kretprobe(event="__sys_sendto", fn_name="do_return")
+
 b = BPF(src_file = "vfsreadlat.c")
-b.attach_kprobe(event="vfs_read", fn_name="do_entry")
-b.attach_kretprobe(event="vfs_read", fn_name="do_return")
+b.attach_kprobe(event="sock_sendmsg", fn_name="do_entry")
+b.attach_kretprobe(event="sock_sendmsg", fn_name="do_return")
+
+e = BPF(src_file = "vfsreadlat.c")
+e.attach_kprobe(event="security_socket_sendmsg", fn_name="do_entry")
+e.attach_kretprobe(event="security_socket_sendmsg", fn_name="do_return")
+
+c = BPF(src_file = "vfsreadlat.c")
+c.attach_kprobe(event="xsk_sendmsg", fn_name="do_entry")
+c.attach_kretprobe(event="xsk_sendmsg", fn_name="do_return")
+
+# d = BPF(src_file = "vfsreadlat.c")
+# d.attach_kprobe(event="xsk_generic_xmit", fn_name="do_entry")
+# d.attach_kretprobe(event="xsk_generic_xmit", fn_name="do_return")
+
+# d = BPF(src_file = "vfsreadlat.c")
+# d.attach_kprobe(event="xsk_xmit", fn_name="do_entry")
+# d.attach_kretprobe(event="xsk_xmit", fn_name="do_return")
+
+f = BPF(src_file = "vfsreadlat.c")
+f.attach_kprobe(event="sockfd_lookup_light", fn_name="do_entry")
+f.attach_kretprobe(event="sockfd_lookup_light", fn_name="do_return")
+
+g = BPF(src_file = "vfsreadlat.c")
+g.attach_kprobe(event="handle_mm_fault", fn_name="do_entry_pg")
+# a = BPF(src_file = "vfsreadlat.c")
+# a.attach_kprobe(event=a.get_syscall_fnname("getpid"), fn_name="do_entry")
+# a.attach_kretprobe(event=a.get_syscall_fnname("getpid"), fn_name="do_return")
 
 # header
 print("Tracing... Hit Ctrl-C to end.")
@@ -58,8 +88,34 @@ while (1):
 	except KeyboardInterrupt:
 		pass; do_exit = 1
 
-	print()
+	print("systemcall")
+	a["dist"].print_log2_hist("usecs")
+	a["dist"].clear()
+
+	print("lookup")
+	f["dist"].print_log2_hist("usecs")
+	f["dist"].clear()
+
+	print("sock send")
 	b["dist"].print_log2_hist("usecs")
 	b["dist"].clear()
+
+	print("security")
+	e["dist"].print_log2_hist("usecs")
+	e["dist"].clear()
+    
+	print("xsk send")
+	c["dist"].print_log2_hist("usecs")
+	c["dist"].clear()
+
+	print("page fualt")
+	print(list(list(g["arr"].items())[0][1]))
+	# print(dir(list(g["arr"].items())[0][1]))
+	g["arr"].clear()
+
+	# print("netvsc send")
+	# d["dist"].print_log2_hist("usecs")
+	# d["dist"].clear()
+
 	if do_exit:
 		exit()

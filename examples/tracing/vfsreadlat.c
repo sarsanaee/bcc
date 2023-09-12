@@ -1,19 +1,27 @@
-/*
- * vfsreadlat.c		VFS read latency distribution.
- *			For Linux, uses BCC, eBPF. See .py file.
- *
- * Copyright (c) 2013-2015 PLUMgrid, http://plumgrid.com
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of version 2 of the GNU General Public
- * License as published by the Free Software Foundation.
- *
- * 15-Aug-2015	Brendan Gregg	Created this.
- */
+/* SPDX-License-Identifier: GPL-2.0 */
 
 #include <uapi/linux/ptrace.h>
+// #include <bpf/bpf_helpers.h>
+#include <linux/bpf.h>
 
 BPF_HASH(start, u32);
 BPF_HISTOGRAM(dist);
+BPF_PERCPU_ARRAY(arr, u64, 1);
+
+int do_entry_pg(struct pt_regs *ctx)
+{
+	u32 pid;
+    u32 index = 0;
+    u64 *val;
+
+	val = arr.lookup(&index);
+
+    if (val) {
+        *val = *val+1;
+    }
+
+	return 0;
+}
 
 int do_entry(struct pt_regs *ctx)
 {
@@ -21,8 +29,10 @@ int do_entry(struct pt_regs *ctx)
 	u64 ts;
 
 	pid = bpf_get_current_pid_tgid();
-	ts = bpf_ktime_get_ns();
+    ts = bpf_ktime_get_ns();
+
 	start.update(&pid, &ts);
+
 	return 0;
 }
 
@@ -42,3 +52,6 @@ int do_return(struct pt_regs *ctx)
 
 	return 0;
 }
+
+
+// char LICENSE[] SEC("license") = "GPL";
